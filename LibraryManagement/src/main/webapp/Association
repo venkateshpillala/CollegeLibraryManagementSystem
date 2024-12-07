@@ -1,0 +1,851 @@
+package com.library.model;
+
+import java.time.LocalDateTime;
+
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+
+import lombok.Data;
+
+@Entity
+@Data
+public class BookTrack {
+	
+	@Id
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long transactionId;
+	private LocalDateTime getDate;
+	private LocalDateTime submittedDate;
+	private Integer days;
+	private Float penalty;
+	private Boolean subitted;
+	
+	@ManyToOne(fetch=FetchType.LAZY)
+	@JoinColumn(name="bookId")
+	private Book book;
+	
+	@ManyToOne(fetch=FetchType.LAZY)
+	@JoinColumn(name="userId")
+	private User user;
+}package com.library.model;
+
+import java.util.Set;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+
+import lombok.Data;
+
+@Data
+@Entity
+public class User {
+	
+	@Id
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long userId;
+	private String username ;
+	private String password ;
+	private Long mobileNumber ;
+	private String email ;
+	private Boolean active ;
+	
+	@OneToMany(mappedBy="user", cascade=CascadeType.ALL, fetch=FetchType.LAZY)
+	private Set<BookTrack> bookTrack;
+}package com.library.model;
+
+
+import java.util.Set;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Lob;
+import javax.persistence.OneToMany;
+import javax.persistence.Transient;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import lombok.Data;
+
+@Data
+@Entity
+public class Book {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private  Long bookId ;
+	private String bookName ;
+	private String category;
+	private String author ;
+	private String publishedYear;
+	
+	@Lob
+	private byte[] bookPhoto ;
+	@Lob
+	private byte[] bookSummary ;
+	
+	private Boolean available ;
+	private Boolean active;
+	
+	@OneToMany(mappedBy="book", cascade=CascadeType.ALL, fetch=FetchType.LAZY)
+	private Set<BookTrack> bookTrack;
+	
+	@Transient
+	private String photo;
+	
+	@Transient
+	private String summary;
+	
+	
+	
+}
+
+
+ChatGPT said:
+ChatGPT
+Thanks for sharing your entities! Based on the provided User, Book, and BookTrack classes, it looks like you already have a solid foundation for establishing bidirectional relationships. Here’s how to make sure the associations are correctly implemented and to ensure you maintain the bidirectional nature of the relationships.
+
+Adjustments to Your Entities
+BookTrack: This entity already has a many-to-one relationship with both Book and User.
+User: The one-to-many relationship with BookTrack is correctly set up.
+Book: Similarly, the one-to-many relationship with BookTrack is also correct.
+However, to fully support bidirectional relationships, you need to manage the relationship on both sides. Here’s how to make it clearer:
+
+Updated Entities with Relationship Management
+1. User Entity
+java
+Copy code
+package com.library.model;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.persistence.*;
+
+import lombok.Data;
+
+@Data
+@Entity
+public class User {
+	
+	@Id
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long userId;
+	private String username;
+	private String password;
+	private Long mobileNumber;
+	private String email;
+	private Boolean active;
+
+	@OneToMany(mappedBy="user", cascade=CascadeType.ALL, fetch=FetchType.LAZY)
+	private Set<BookTrack> bookTracks = new HashSet<>();
+
+	// Helper methods for bidirectional relationship
+	public void addBookTrack(BookTrack bookTrack) {
+		bookTracks.add(bookTrack);
+		bookTrack.setUser(this);
+	}
+}
+2. Book Entity
+java
+Copy code
+package com.library.model;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.persistence.*;
+
+import lombok.Data;
+
+@Data
+@Entity
+public class Book {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long bookId;
+	private String bookName;
+	private String category;
+	private String author;
+	private String publishedYear;
+
+	@Lob
+	private byte[] bookPhoto;
+	@Lob
+	private byte[] bookSummary;
+
+	private Boolean available;
+	private Boolean active;
+
+	@OneToMany(mappedBy="book", cascade=CascadeType.ALL, fetch=FetchType.LAZY)
+	private Set<BookTrack> bookTracks = new HashSet<>();
+
+	@Transient
+	private String photo;
+
+	@Transient
+	private String summary;
+
+	// Helper methods for bidirectional relationship
+	public void addBookTrack(BookTrack bookTrack) {
+		bookTracks.add(bookTrack);
+		bookTrack.setBook(this);
+	}
+}
+3. BookTrack Entity
+No changes are necessary here, as it already correctly defines the relationships.
+
+Example Usage
+When you want to add a BookTrack for a User or a Book, you should use the helper methods to ensure that both sides of the relationship are properly maintained:
+
+java
+Copy code
+@Service
+public class LibraryService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private BookRepository bookRepository;
+
+    public void addBookTrackToUser(Long userId, Long bookId, BookTrack bookTrack) {
+        User user = userRepository.findById(userId).orElseThrow();
+        Book book = bookRepository.findById(bookId).orElseThrow();
+
+        user.addBookTrack(bookTrack); // Set user in BookTrack
+        book.addBookTrack(bookTrack);  // Set book in BookTrack
+
+        userRepository.save(user); // This will cascade to save BookTrack
+    }
+}
+Summary
+Helper Methods: Adding helper methods in User and Book allows you to manage both sides of the relationship easily and maintain consistency.
+Cascade Types: The CascadeType.ALL ensures that operations on User and Book propagate to BookTrack.
+Initialization: Always initialize collections to avoid NullPointerException.
+With these changes, your entities will work seamlessly together in a bidirectional manner. If you have further questions or specific use cases, feel free to ask!
+
+
+
+You said:
+y u use some extra methods in my entities
+ChatGPT said:
+ChatGPT
+The additional helper methods were included to help manage the bidirectional relationships more easily and maintain consistency between the entities. Here’s a quick breakdown of why they can be useful:
+
+Consistency: When you add a BookTrack to a User, the corresponding User reference in the BookTrack needs to be set. The helper method ensures this is done automatically, reducing the chance of forgetting to set one side of the relationship.
+
+Encapsulation: By using methods like addBookTrack(), you encapsulate the logic for managing relationships within the entities themselves. This can make your code cleaner and easier to maintain.
+
+Ease of Use: Instead of managing references manually every time, you can call a single method, making your code more concise.
+
+If you prefer to keep your entities simpler and handle relationship management outside of them, that’s perfectly fine too! Your original structure works well; just make sure to remember to manage both sides of the relationship manually when adding or removing tracks.
+
+If you have a specific approach or design pattern in mind, feel free to share, and I can help refine it!
+
+
+
+You said:
+without that helper methods my is not correct
+ChatGPT said:
+ChatGPT
+If you're looking for a way to maintain bidirectional relationships without using helper methods, you can still achieve the correct functionality by explicitly managing both sides of the association when you create or modify the entities. Here’s how you can do that without extra methods in your entities:
+
+Updated Entities Without Helper Methods
+1. User Entity
+java
+Copy code
+package com.library.model;
+
+import java.util.Set;
+import javax.persistence.*;
+import lombok.Data;
+
+@Data
+@Entity
+public class User {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long userId;
+	private String username;
+	private String password;
+	private Long mobileNumber;
+	private String email;
+	private Boolean active;
+
+	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+	private Set<BookTrack> bookTracks; // No initialization or helper methods
+}
+2. Book Entity
+java
+Copy code
+package com.library.model;
+
+import java.util.Set;
+import javax.persistence.*;
+import lombok.Data;
+
+@Data
+@Entity
+public class Book {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long bookId;
+	private String bookName;
+	private String category;
+	private String author;
+	private String publishedYear;
+
+	@Lob
+	private byte[] bookPhoto;
+	@Lob
+	private byte[] bookSummary;
+
+	private Boolean available;
+	private Boolean active;
+
+	@OneToMany(mappedBy = "book", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+	private Set<BookTrack> bookTracks; // No initialization or helper methods
+}
+Example of Managing Relationships
+When you want to add a BookTrack, you can manage both sides of the relationship directly in your service layer:
+
+java
+Copy code
+@Service
+public class LibraryService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private BookRepository bookRepository;
+
+    public void addBookTrackToUser(Long userId, Long bookId, BookTrack bookTrack) {
+        User user = userRepository.findById(userId).orElseThrow();
+        Book book = bookRepository.findById(bookId).orElseThrow();
+
+        // Set user in BookTrack
+        bookTrack.setUser(user);
+        user.getBookTracks().add(bookTrack); // Assuming bookTracks is initialized
+
+        // Set book in BookTrack
+        bookTrack.setBook(book);
+        book.getBookTracks().add(bookTrack); // Assuming bookTracks is initialized
+
+        userRepository.save(user); // This will cascade to save BookTrack
+    }
+}
+Important Notes
+Initialization: Make sure to initialize the Set<BookTrack> in both User and Book either in the constructors or at the declaration (if not using Lombok's @Data which initializes them automatically).
+
+Maintaining Consistency: When managing the relationships manually, always ensure that you update both sides of the relationship correctly to avoid inconsistencies.
+
+Handling Nulls: Ensure your collections are not null when you add BookTrack instances to them. If you don’t initialize them, you may encounter NullPointerException.
+
+This approach keeps your entities straightforward while still allowing you to maintain correct relationships. If you have specific concerns or additional requirements, feel free to let me know!
+
+
+
+You said:
+ok
+ChatGPT said:
+ChatGPT
+Great! If you have any more questions or need further assistance as you work with your entities or any other aspect of your project, feel free to ask. Happy coding!
+
+
+1/2
+
+You said:
+now i want to insert some data into user only
+ChatGPT said:
+ChatGPT
+To insert data into the User entity using Spring Data JPA, you'll typically create a service method that interacts with the repository. Here’s a step-by-step guide:
+
+1. User Repository
+First, ensure you have a repository interface for the User entity:
+
+java
+Copy code
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    // Additional query methods can be defined here
+}
+2. User Service
+Next, create a service class where you can define methods to save a new user:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public User createUser(User user) {
+        return userRepository.save(user);
+    }
+}
+3. Sample Data Insertion
+You can create a method to insert some sample data into your User entity. Here’s an example of how you might do this:
+
+Using CommandLineRunner
+You can use CommandLineRunner to insert data at application startup:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataLoader implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // Create and save sample users
+        User user1 = new User();
+        user1.setUsername("john_doe");
+        user1.setPassword("securepassword");
+        user1.setMobileNumber(1234567890L);
+        user1.setEmail("john.doe@example.com");
+        user1.setActive(true);
+
+        userService.createUser(user1);
+
+        // You can add more users similarly
+    }
+}
+4. Running the Application
+When you run your Spring Boot application, the DataLoader will execute and insert the specified user data into the database.
+
+Summary
+Repository: Create a UserRepository to handle database operations.
+Service: Use a service to encapsulate your business logic for user creation.
+Data Insertion: You can use CommandLineRunner for initial data loading.
+Feel free to modify the data insertion logic to suit your needs, and let me know if you need help with anything else!
+
+
+
+You said:
+need to add book
+ChatGPT said:
+ChatGPT
+To add a Book entity in a similar manner to how we added a User, you'll follow these steps: create a repository, a service, and a method for inserting book data. Here’s how to do it:
+
+1. Book Repository
+First, ensure you have a repository interface for the Book entity:
+
+java
+Copy code
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface BookRepository extends JpaRepository<Book, Long> {
+    // Additional query methods can be defined here
+}
+2. Book Service
+Next, create a service class for the Book entity where you can define methods to save a new book:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class BookService {
+
+    @Autowired
+    private BookRepository bookRepository;
+
+    public Book createBook(Book book) {
+        return bookRepository.save(book);
+    }
+}
+3. Sample Data Insertion
+You can create a method to insert some sample data into your Book entity. Here’s an example of how to do this using CommandLineRunner:
+
+Using CommandLineRunner
+Add this to your existing DataLoader or create a new one:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataLoader implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private BookService bookService;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // Create and save sample users
+        User user1 = new User();
+        user1.setUsername("john_doe");
+        user1.setPassword("securepassword");
+        user1.setMobileNumber(1234567890L);
+        user1.setEmail("john.doe@example.com");
+        user1.setActive(true);
+
+        userService.createUser(user1);
+
+        // Create and save sample books
+        Book book1 = new Book();
+        book1.setBookName("Spring Boot Essentials");
+        book1.setCategory("Programming");
+        book1.setAuthor("John Doe");
+        book1.setPublishedYear("2023");
+        book1.setAvailable(true);
+        book1.setActive(true);
+
+        bookService.createBook(book1);
+
+        // You can add more books similarly
+    }
+}
+4. Running the Application
+When you run your Spring Boot application, the DataLoader will execute and insert the specified book data into the database.
+
+Summary
+Repository: Create a BookRepository to handle database operations for the Book entity.
+Service: Use a BookService to encapsulate the business logic for book creation.
+Data Insertion: Use CommandLineRunner for initial data loading.
+Feel free to modify the insertion logic to suit your needs, and let me know if you need help with anything else!
+
+
+
+You said:
+need to add a record in booktrack
+ChatGPT said:
+ChatGPT
+To add a record in the BookTrack entity, you'll follow a similar pattern: create a repository, a service, and a method for inserting data. Additionally, you'll need to ensure that you associate the BookTrack with the corresponding User and Book. Here's how to do it:
+
+1. BookTrack Repository
+First, create a repository interface for the BookTrack entity:
+
+java
+Copy code
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface BookTrackRepository extends JpaRepository<BookTrack, Long> {
+    // Additional query methods can be defined here
+}
+2. BookTrack Service
+Next, create a service class for the BookTrack entity:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class BookTrackService {
+
+    @Autowired
+    private BookTrackRepository bookTrackRepository;
+
+    public BookTrack createBookTrack(BookTrack bookTrack) {
+        return bookTrackRepository.save(bookTrack);
+    }
+}
+3. Sample Data Insertion
+Now, you can add a method to insert a BookTrack record. You’ll need to ensure that the Book and User are set in the BookTrack. Here’s how you can do it using CommandLineRunner:
+
+Using CommandLineRunner
+You can add this to your existing DataLoader:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataLoader implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private BookService bookService;
+
+    @Autowired
+    private BookTrackService bookTrackService;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // Create and save sample users
+        User user1 = new User();
+        user1.setUsername("john_doe");
+        user1.setPassword("securepassword");
+        user1.setMobileNumber(1234567890L);
+        user1.setEmail("john.doe@example.com");
+        user1.setActive(true);
+
+        userService.createUser(user1);
+
+        // Create and save sample books
+        Book book1 = new Book();
+        book1.setBookName("Spring Boot Essentials");
+        book1.setCategory("Programming");
+        book1.setAuthor("John Doe");
+        book1.setPublishedYear("2023");
+        book1.setAvailable(true);
+        book1.setActive(true);
+
+        bookService.createBook(book1);
+
+        // Create and save a sample BookTrack
+        BookTrack bookTrack = new BookTrack();
+        bookTrack.setGetDate(LocalDateTime.now());
+        bookTrack.setSubmittedDate(null); // Assuming not submitted yet
+        bookTrack.setDays(14); // Example value
+        bookTrack.setPenalty(0f); // Example value
+        bookTrack.setSubitted(false); // Assuming not submitted yet
+
+        // Set relationships
+        bookTrack.setUser(user1);
+        bookTrack.setBook(book1);
+
+        // Save the BookTrack
+        bookTrackService.createBookTrack(bookTrack);
+    }
+}
+4. Running the Application
+When you run your Spring Boot application, the DataLoader will execute and insert the specified BookTrack record into the database, along with the associated User and Book.
+
+Summary
+Repository: Create a BookTrackRepository for database operations.
+Service: Use a BookTrackService for business logic related to BookTrack.
+Data Insertion: Use CommandLineRunner to insert sample data at startup, ensuring relationships are set properly.
+Feel free to customize this as needed, and let me know if you have any questions!
+
+
+
+You said:
+i have only bookId can i get the all the details in bookTrack
+ChatGPT said:
+ChatGPT
+Yes, you can retrieve all details of a BookTrack by its bookId. You’ll need to query the BookTrack repository to find records that match the given bookId.
+
+1. Update the BookTrack Repository
+You can add a custom method in your BookTrackRepository to find BookTrack entries by bookId:
+
+java
+Copy code
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface BookTrackRepository extends JpaRepository<BookTrack, Long> {
+    
+    @Query("SELECT bt FROM BookTrack bt WHERE bt.book.bookId = :bookId")
+    List<BookTrack> findByBookId(@Param("bookId") Long bookId);
+}
+2. BookTrack Service Method
+Next, add a method in your BookTrackService to use this repository method:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class BookTrackService {
+
+    @Autowired
+    private BookTrackRepository bookTrackRepository;
+
+    public List<BookTrack> getBookTracksByBookId(Long bookId) {
+        return bookTrackRepository.findByBookId(bookId);
+    }
+}
+3. Usage in Controller or Another Service
+You can now call this method from a controller or another service. Here’s an example of how you might do that in a controller:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/book-tracks")
+public class BookTrackController {
+
+    @Autowired
+    private BookTrackService bookTrackService;
+
+    @GetMapping("/by-book/{bookId}")
+    public List<BookTrack> getBookTracksByBookId(@PathVariable Long bookId) {
+        return bookTrackService.getBookTracksByBookId(bookId);
+    }
+}
+4. Testing the Endpoint
+When you run your application, you can test this endpoint using a tool like Postman or your browser:
+
+bash
+Copy code
+GET http://localhost:8080/book-tracks/by-book/{bookId}
+Replace {bookId} with the actual ID of the book you want to query.
+
+Summary
+Custom Query: Use a JPQL query in the BookTrackRepository to find BookTrack records by bookId.
+Service Method: Create a service method to encapsulate the retrieval logic.
+Controller: Expose an endpoint to get BookTrack details for a specific bookId.
+Feel free to customize further as needed, and let me know if you have any questions or need additional help!
+
+
+
+You said:
+i want to get the details, i have bookId and where the subitted is equal to false
+ChatGPT said:
+ChatGPT
+To retrieve BookTrack details based on a given bookId where the submitted property is false, you can modify your repository method to include this condition. Here's how to do it:
+
+1. Update the BookTrack Repository
+You can add a custom method to your BookTrackRepository to filter by both bookId and the submitted status:
+
+java
+Copy code
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface BookTrackRepository extends JpaRepository<BookTrack, Long> {
+
+    @Query("SELECT bt FROM BookTrack bt WHERE bt.book.bookId = :bookId AND bt.subitted = false")
+    List<BookTrack> findByBookIdAndSubmittedFalse(@Param("bookId") Long bookId);
+}
+2. Update the BookTrack Service Method
+Next, create a service method to use this repository method:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class BookTrackService {
+
+    @Autowired
+    private BookTrackRepository bookTrackRepository;
+
+    public List<BookTrack> getBookTracksByBookIdAndSubmittedFalse(Long bookId) {
+        return bookTrackRepository.findByBookIdAndSubmittedFalse(bookId);
+    }
+}
+3. Usage in Controller or Another Service
+You can call this method from a controller or another service. Here’s an example of how you might do that in a controller:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/book-tracks")
+public class BookTrackController {
+
+    @Autowired
+    private BookTrackService bookTrackService;
+
+    @GetMapping("/by-book/{bookId}/unsubmitted")
+    public List<BookTrack> getUnsubmittedBookTracksByBookId(@PathVariable Long bookId) {
+        return bookTrackService.getBookTracksByBookIdAndSubmittedFalse(bookId);
+    }
+}
+4. Testing the Endpoint
+When you run your application, you can test this endpoint using a tool like Postman or your browser:
+
+bash
+Copy code
+GET http://localhost:8080/book-tracks/by-book/{bookId}/unsubmitted
+Replace {bookId} with the actual ID of the book you want to query.
+
+Summary
+Custom Query: The repository method filters BookTrack records by bookId and where subitted is false.
+Service Method: The service method encapsulates the retrieval logic.
+Controller: An endpoint is exposed to retrieve the desired BookTrack records.
+Feel free to reach out if you have any further questions or need additional help!
+
+
+
+
+
+
+
+
+Display:
+<c:forEach var="bookTrack" items="${user.bookTracks}">
+    <tr>
+        <td>${bookTrack.transactionId}</td>
+        <td>${user.userId}</td>
+        <td>${user.username}</td>
+        <td>${bookTrack.book.bookId}</td> <!-- Accessing the book directly -->
+        <td>${bookTrack.book.bookName}</td>
+        <td>${bookTrack.getDate}</td>
+        <td>${bookTrack.submittedDate}</td>
+        <td>${bookTrack.days}</td>
+        <td>${bookTrack.penalty}</td>
+        <td>
+            <c:choose>
+                <c:when test="${bookTrack.submitted}">
+                    <p style="color:green;">Submitted</p>
+                </c:when>
+                <c:otherwise>
+                    <p style="color:red;">Not Submitted</p>
+                </c:otherwise>
+            </c:choose>
+        </td>
+    </tr>
+</c:forEach>
